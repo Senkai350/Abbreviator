@@ -60,6 +60,35 @@ namespace Abbreviator.Core
             }
         }
 
+        /// <summary>
+        /// Не даём журналу расти без предела: когда файл перевалит за MaxBytes,
+        /// оставляем последнюю четверть строк.
+        /// </summary>
+        private static void Truncate()
+        {
+            try
+            {
+                var info = new FileInfo(LogPath);
+                if (!info.Exists || info.Length <= MaxBytes) return;
+
+                string[] lines = File.ReadAllLines(LogPath, Encoding.UTF8);
+                int keep = lines.Length / 4;
+                if (keep < 1)
+                {
+                    File.Delete(LogPath);
+                    return;
+                }
+
+                var tail = new string[keep];
+                Array.Copy(lines, lines.Length - keep, tail, 0, keep);
+                File.WriteAllLines(LogPath, tail, new UTF8Encoding(true));
+            }
+            catch
+            {
+                // Не смогли подрезать — не беда, пишем дальше.
+            }
+        }
+
         public static void Error(string context, Exception ex)
         {
             if (ex == null)

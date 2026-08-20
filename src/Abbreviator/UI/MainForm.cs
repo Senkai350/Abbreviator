@@ -27,8 +27,6 @@ namespace Abbreviator.UI
         private readonly CheckBox _onlyUnknown;
         private readonly Label _summary;
 
-        private bool _loading;
-
         public MainForm(AddInController controller)
         {
             _controller = controller;
@@ -189,17 +187,9 @@ namespace Abbreviator.UI
 
         public void ReloadFromDocument()
         {
-            _loading = true;
-            try
-            {
-                FillPages();
-                FillResults();
-                FillSummary();
-            }
-            finally
-            {
-                _loading = false;
-            }
+            FillPages();
+            FillResults();
+            FillSummary();
         }
 
         private DocumentState CurrentState
