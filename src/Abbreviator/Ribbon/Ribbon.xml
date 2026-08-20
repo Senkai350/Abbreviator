@@ -6,12 +6,19 @@
       <tab id="AbbrTab" label="Abbreviator" insertAfterMso="TabHome">
 
         <group id="AbbrGroupCheck" label="Проверка">
+          <toggleButton id="AbbrLive"
+                        label="Живая подсветка"
+                        size="large"
+                        getPressed="GetLivePressed"
+                        onAction="OnLiveToggle"
+                        screentip="Живая подсветка"
+                        supertip="Подчёркивать сокращения волнистой линией поверх текста — как проверку орфографии. Красным — тех, которых нет в перечне, зелёным — принятые. Документ при этом не изменяется."/>
           <button id="AbbrCheck"
                   label="Проверить документ"
                   size="large"
                   onAction="OnCheck"
-                  screentip="Проверить документ"
-                  supertip="Найти все аббревиатуры и подсветить их: зелёным — те, что есть в перечне принятых сокращений, красным — те, которых в нём нет."/>
+                  screentip="Проверить документ (заливкой)"
+                  supertip="Найти все аббревиатуры и закрасить их фон: зелёным — те, что есть в перечне принятых сокращений, красным — те, которых в нём нет. В отличие от живой подсветки изменяет выделение цветом в документе."/>
           <button id="AbbrClear"
                   label="Снять подсветку"
                   onAction="OnClear"

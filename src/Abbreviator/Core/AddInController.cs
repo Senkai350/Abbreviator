@@ -26,6 +26,7 @@ namespace Abbreviator.Core
         private int _cachedTargetPos = -1;
 
         private MainForm _mainForm;
+        private LiveCheck _live;
 
         public dynamic App { get; private set; }
 
@@ -37,10 +38,34 @@ namespace Abbreviator.Core
         public AddInController(dynamic app)
         {
             App = app;
+            _live = new LiveCheck(this);
+            if (Settings.LiveHighlight) _live.Start();
+        }
+
+        /// <summary>Включена ли живая подсветка (волнистые подчёркивания поверх окна).</summary>
+        public bool LiveEnabled
+        {
+            get { return _live != null && _live.Enabled; }
+        }
+
+        public void SetLiveEnabled(bool enabled)
+        {
+            Settings.LiveHighlight = enabled;
+            Settings.Save();
+            if (_live == null) return;
+            if (enabled) { _live.Invalidate(); _live.Start(); }
+            else _live.Stop();
         }
 
         public void Shutdown()
         {
+            try
+            {
+                if (_live != null) _live.Dispose();
+            }
+            catch { }
+            _live = null;
+
             try
             {
                 if (_mainForm != null && !_mainForm.IsDisposed) _mainForm.Close();
@@ -99,6 +124,7 @@ namespace Abbreviator.Core
             _cachedTarget = null;
             _cachedTargetAt = DateTime.MinValue;
             _cachedTargetPos = -1;
+            if (_live != null) _live.Invalidate();
         }
 
         // ==================================================================

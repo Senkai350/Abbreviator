@@ -148,6 +148,16 @@ namespace Abbreviator
 
         public void OnCheck(object control) { Run(() => _controller.CheckDocument()); }
 
+        public bool GetLivePressed(object control)
+        {
+            return Run(() => _controller.LiveEnabled, false);
+        }
+
+        public void OnLiveToggle(object control, bool pressed)
+        {
+            Run(() => _controller.SetLiveEnabled(pressed));
+        }
+
         public void OnClear(object control) { Run(() => _controller.ClearHighlights()); }
 
         public void OnClearAll(object control) { Run(() => _controller.ClearAllHighlights()); }

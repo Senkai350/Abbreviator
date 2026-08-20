@@ -23,6 +23,7 @@ namespace Abbreviator.UI
         private readonly ComboBox _unknownColor;
         private readonly CheckBox _highlightDict;
         private readonly CheckBox _highlightIgnored;
+        private readonly CheckBox _liveShowKnown;
 
         private readonly TextBox _separator;
         private readonly CheckBox _alphabetical;
@@ -46,7 +47,7 @@ namespace Abbreviator.UI
             MinimizeBox = false;
             MaximizeBox = false;
             ShowInTaskbar = false;
-            ClientSize = new Size(560, 600);
+            ClientSize = new Size(560, 624);
             Font = SystemFonts.MessageBoxFont;
 
             int y = 12;
@@ -81,7 +82,7 @@ namespace Abbreviator.UI
             Controls.Add(_spellMin);
             y += 44;
 
-            Controls.Add(Group("Подсветка", 12, y, 536, 116));
+            Controls.Add(Group("Подсветка", 12, y, 536, 140));
             y += 26;
 
             Controls.Add(Lab("Есть в перечне:", 28, y + 3));
@@ -100,6 +101,10 @@ namespace Abbreviator.UI
 
             _highlightIgnored = Check("Помечать игнорируемые серым", 28, y, settings.HighlightIgnored);
             Controls.Add(_highlightIgnored);
+            y += 24;
+
+            _liveShowKnown = Check("Живая подсветка: подчёркивать и принятые (зелёным)", 28, y, settings.LiveShowKnown);
+            Controls.Add(_liveShowKnown);
             y += 42;
 
             Controls.Add(Group("Перечень", 12, y, 536, 150));
@@ -255,6 +260,7 @@ namespace Abbreviator.UI
             _settings.UnknownColor = ColorFrom(_unknownColor);
             _settings.HighlightDictionarySection = _highlightDict.Checked;
             _settings.HighlightIgnored = _highlightIgnored.Checked;
+            _settings.LiveShowKnown = _liveShowKnown.Checked;
 
             _settings.EntrySeparator = string.IsNullOrEmpty(_separator.Text) ? " - " : _separator.Text;
             _settings.KeepAlphabeticalOrder = _alphabetical.Checked;
@@ -286,6 +292,7 @@ namespace Abbreviator.UI
             _unknownColor.SelectedIndex = Math.Max(0, Array.IndexOf(Colors, defaults.UnknownColor));
             _highlightDict.Checked = defaults.HighlightDictionarySection;
             _highlightIgnored.Checked = defaults.HighlightIgnored;
+            _liveShowKnown.Checked = defaults.LiveShowKnown;
 
             _separator.Text = defaults.EntrySeparator;
             _alphabetical.Checked = defaults.KeepAlphabeticalOrder;

@@ -29,6 +29,10 @@ namespace Abbreviator.Core
         public bool HighlightDictionarySection = false;
         public bool HighlightIgnored = false;
 
+        // --- живая подсветка (оверлей, документ не изменяется) ---
+        public bool LiveHighlight = true;
+        public bool LiveShowKnown = true;
+
         // --- перечень ---
         public string EntrySeparator = " - ";
         public bool KeepAlphabeticalOrder = false;
@@ -112,6 +116,8 @@ namespace Abbreviator.Core
                 s.UnknownColor = GetInt(map, "UnknownColor", s.UnknownColor);
                 s.HighlightDictionarySection = GetBool(map, "HighlightDictionarySection", s.HighlightDictionarySection);
                 s.HighlightIgnored = GetBool(map, "HighlightIgnored", s.HighlightIgnored);
+                s.LiveHighlight = GetBool(map, "LiveHighlight", s.LiveHighlight);
+                s.LiveShowKnown = GetBool(map, "LiveShowKnown", s.LiveShowKnown);
 
                 s.EntrySeparator = GetStr(map, "EntrySeparator", s.EntrySeparator);
                 s.KeepAlphabeticalOrder = GetBool(map, "KeepAlphabeticalOrder", s.KeepAlphabeticalOrder);
@@ -158,6 +164,8 @@ namespace Abbreviator.Core
                 sb.AppendLine("UnknownColor=" + UnknownColor);
                 sb.AppendLine("HighlightDictionarySection=" + Fmt(HighlightDictionarySection));
                 sb.AppendLine("HighlightIgnored=" + Fmt(HighlightIgnored));
+                sb.AppendLine("LiveHighlight=" + Fmt(LiveHighlight));
+                sb.AppendLine("LiveShowKnown=" + Fmt(LiveShowKnown));
                 sb.AppendLine();
                 sb.AppendLine("[Dictionary]");
                 sb.AppendLine("EntrySeparator=" + EntrySeparator);
