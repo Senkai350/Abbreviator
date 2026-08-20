@@ -155,10 +155,14 @@ if (-not $dllPath) {
     }
 
     # CoCreateInstance through the registration, the way Word starts.
+    # When the assembly is already loaded into this process, New-Object returns
+    # the managed object itself, not a __ComObject - releasing is then a no-op.
     try {
         $com = New-Object -ComObject $ProgId
         Write-Host '7. CoCreateInstance by ProgId: OK' -ForegroundColor Green
-        [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($com)
+        if ([System.Runtime.InteropServices.Marshal]::IsComObject($com)) {
+            [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($com)
+        }
     } catch {
         Write-Host '7. CoCreateInstance by ProgId: FAILED' -ForegroundColor Red
         Show-Exception $_.Exception

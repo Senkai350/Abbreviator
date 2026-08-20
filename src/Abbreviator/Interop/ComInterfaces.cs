@@ -41,6 +41,12 @@ namespace Abbreviator.Interop
     /// <summary>
     /// Интерфейс COM-надстройки Office. Объявлен вручную, чтобы не тянуть
     /// Extensibility.dll. Порядок методов менять нельзя — он задаёт vtable.
+    ///
+    /// Параметр custom у всех методов — SAFEARRAY(VARIANT)*, поэтому MarshalAs
+    /// обязателен: без него CLR маршалирует System.Array как интерфейсный
+    /// указатель, разыменовывает SAFEARRAY как vtable и Word падает с
+    /// access violation (0xc0000005) в clr.dll прямо на вызове OnConnection.
+    /// Ровно так параметр объявлен и в настоящей Extensibility.dll.
     /// </summary>
     [ComVisible(true)]
     [Guid("B65AD801-ABAF-11D0-BB8B-00A0C90F2744")]
@@ -52,19 +58,29 @@ namespace Abbreviator.Interop
             [MarshalAs(UnmanagedType.IDispatch)] object application,
             ext_ConnectMode connectMode,
             [MarshalAs(UnmanagedType.IDispatch)] object addInInst,
+            [MarshalAs(UnmanagedType.SafeArray, SafeArraySubType = VarEnum.VT_VARIANT)]
             ref Array custom);
 
         [DispId(2)]
-        void OnDisconnection(ext_DisconnectMode removeMode, ref Array custom);
+        void OnDisconnection(
+            ext_DisconnectMode removeMode,
+            [MarshalAs(UnmanagedType.SafeArray, SafeArraySubType = VarEnum.VT_VARIANT)]
+            ref Array custom);
 
         [DispId(3)]
-        void OnAddInsUpdate(ref Array custom);
+        void OnAddInsUpdate(
+            [MarshalAs(UnmanagedType.SafeArray, SafeArraySubType = VarEnum.VT_VARIANT)]
+            ref Array custom);
 
         [DispId(4)]
-        void OnStartupComplete(ref Array custom);
+        void OnStartupComplete(
+            [MarshalAs(UnmanagedType.SafeArray, SafeArraySubType = VarEnum.VT_VARIANT)]
+            ref Array custom);
 
         [DispId(5)]
-        void OnBeginShutdown(ref Array custom);
+        void OnBeginShutdown(
+            [MarshalAs(UnmanagedType.SafeArray, SafeArraySubType = VarEnum.VT_VARIANT)]
+            ref Array custom);
     }
 
     /// <summary>
