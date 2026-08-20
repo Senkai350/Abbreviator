@@ -19,7 +19,6 @@ namespace Abbreviator.Interop
 
     /// <summary>Режим подключения надстройки (Extensibility.ext_ConnectMode).</summary>
     [ComVisible(true)]
-    [Guid("B8DA6310-E19B-11D4-BED5-00B0D0A1F19A")]
     public enum ext_ConnectMode
     {
         ext_cm_AfterStartup = 0,
@@ -31,7 +30,6 @@ namespace Abbreviator.Interop
 
     /// <summary>Режим отключения надстройки (Extensibility.ext_DisconnectMode).</summary>
     [ComVisible(true)]
-    [Guid("B8DA6311-E19B-11D4-BED5-00B0D0A1F19A")]
     public enum ext_DisconnectMode
     {
         ext_dm_HostShutdown = 0,

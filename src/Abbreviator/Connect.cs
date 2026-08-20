@@ -12,14 +12,23 @@ namespace Abbreviator
     /// <summary>
     /// Точка входа COM-надстройки Word.
     ///
-    /// Класс помечен AutoDual: обратные вызовы ленты и контекстного меню Office
-    /// ищет по имени через IDispatch, поэтому все они должны быть публичными
-    /// методами этого класса.
+    /// Класс-интерфейс — AutoDispatch, а не AutoDual. Обратные вызовы ленты и
+    /// контекстного меню Office ищет по имени через IDispatch::GetIDsOfNames,
+    /// а его AutoDispatch обслуживает рефлексией по публичным методам класса —
+    /// именно так устроены классы лент в VSTO.
+    ///
+    /// AutoDual вдобавок требует сгенерировать для класса ITypeInfo, то есть
+    /// экспортировать все публичные члены в библиотеку типов. Если экспорт не
+    /// удаётся, CCW не создаётся: объект уже сконструирован, но QueryInterface
+    /// не отвечает, и Word сообщает «произошла ошибка с надстройкой», не вызвав
+    /// ни одного метода. AutoDispatch этот шаг не выполняет вовсе.
+    ///
+    /// Все обратные вызовы обязаны быть публичными методами этого класса.
     /// </summary>
     [ComVisible(true)]
     [Guid("FE63C2BE-14F3-45D9-BE38-98A925BDF989")]
     [ProgId("Abbreviator.Connect")]
-    [ClassInterface(ClassInterfaceType.AutoDual)]
+    [ClassInterface(ClassInterfaceType.AutoDispatch)]
     public class Connect : IDTExtensibility2, IRibbonExtensibility
     {
         private AddInController _controller;
