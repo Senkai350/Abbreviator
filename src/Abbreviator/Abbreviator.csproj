@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
@@ -26,11 +26,14 @@
     .NET Framework 4.8, даже если Office на ней не установлен.
   -->
   <!--
-    System.Windows.Forms в набор ссылок по умолчанию для .NET Framework не входит.
-    Остальное (System, System.Core, System.Drawing, Microsoft.CSharp) SDK
-    подставляет сам, поэтому здесь не перечисляется.
+    Ни Microsoft.CSharp, ни System.Windows.Forms не входят в набор ссылок,
+    который SDK подставляет для .NET Framework по умолчанию.
+    Без Microsoft.CSharp не компилируется dynamic: CS0656, "отсутствует
+    обязательный для компилятора член CSharpArgumentInfo.Create".
+    Остальное (System, System.Core, System.Drawing, System.Xml) добавляет SDK.
   -->
   <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
 

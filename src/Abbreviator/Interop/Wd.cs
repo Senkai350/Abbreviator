@@ -1,4 +1,4 @@
-namespace Abbreviator.Interop
+﻿namespace Abbreviator.Interop
 {
     /// <summary>
     /// Числовые значения перечислений Word, нужные надстройке.

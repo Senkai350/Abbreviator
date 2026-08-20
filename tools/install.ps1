@@ -1,18 +1,18 @@
 <#
 .SYNOPSIS
-    Собирает и регистрирует надстройку Abbreviator для текущего пользователя.
+    Builds and registers the Abbreviator Word add-in for the current user.
 
 .DESCRIPTION
-    Регистрация выполняется только в HKCU, права администратора не нужны.
-    Записываются два набора ключей — обычный и Wow6432Node, чтобы надстройка
-    подхватилась и 64-разрядным, и 32-разрядным Word.
+    Registration is written to HKCU only, so administrator rights are not
+    required. Two sets of keys are written - the normal one and Wow6432Node -
+    so that both 64-bit and 32-bit Word pick the add-in up.
 
 .PARAMETER Dll
-    Путь к уже собранной Abbreviator.dll. Если не задан, проект собирается
-    командой dotnet build -c Release.
+    Path to an already built Abbreviator.dll. When omitted, the project is
+    built with: dotnet build -c Release
 
 .PARAMETER SkipBuild
-    Не собирать проект, использовать то, что уже лежит в bin\Release.
+    Do not build; use whatever is already in bin\Release.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File tools\install.ps1
@@ -32,29 +32,29 @@ $AssemblyName = 'Abbreviator, Version=1.0.0.0, Culture=neutral, PublicKeyToken=n
 $ClassName    = 'Abbreviator.Connect'
 $Runtime      = 'v4.0.30319'
 $FriendlyName = 'Abbreviator'
-$Description  = 'Проверка аббревиатур и перечня принятых сокращений'
+$Description  = 'Abbreviation checker for Word'
 
 $root    = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root 'src\Abbreviator\Abbreviator.csproj'
 $output  = Join-Path $root 'src\Abbreviator\bin\Release\Abbreviator.dll'
 
-# ---------------------------------------------------------------- сборка ---
+# ------------------------------------------------------------------- build ---
 
 if (-not $Dll) {
     if (-not $SkipBuild) {
-        Write-Host 'Сборка проекта...' -ForegroundColor Cyan
+        Write-Host 'Building...' -ForegroundColor Cyan
         & dotnet build $project -c Release
-        if ($LASTEXITCODE -ne 0) { throw "Сборка завершилась с ошибкой ($LASTEXITCODE)." }
+        if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE." }
     }
     $Dll = $output
 }
 
+if (-not (Test-Path $Dll)) { throw "File not found: $Dll" }
 $Dll = (Resolve-Path $Dll).Path
-if (-not (Test-Path $Dll)) { throw "Не найден файл $Dll" }
 
-Write-Host "Регистрируется: $Dll" -ForegroundColor Cyan
+Write-Host "Registering: $Dll" -ForegroundColor Cyan
 
-# ------------------------------------------------------------ регистрация ---
+# -------------------------------------------------------------- registration ---
 
 function Set-Key {
     param([string] $Path, [hashtable] $Values)
@@ -78,22 +78,22 @@ $inproc = @{
     'CodeBase'       = $codeBase
 }
 
-# Обе ветки: 64-разрядный и 32-разрядный Word.
+# Both views, so 64-bit and 32-bit Word can load the add-in.
 $classRoots = @(
     'HKCU:\Software\Classes',
     'HKCU:\Software\Classes\Wow6432Node'
 )
 
 foreach ($classes in $classRoots) {
-    Set-Key "$classes\$ProgId"                      @{ '(default)' = $FriendlyName }
-    Set-Key "$classes\$ProgId\CLSID"                @{ '(default)' = $Clsid }
-    Set-Key "$classes\CLSID\$Clsid"                 @{ '(default)' = $ClassName }
-    Set-Key "$classes\CLSID\$Clsid\ProgId"          @{ '(default)' = $ProgId }
-    Set-Key "$classes\CLSID\$Clsid\InprocServer32"  $inproc
+    Set-Key "$classes\$ProgId"                             @{ '(default)' = $FriendlyName }
+    Set-Key "$classes\$ProgId\CLSID"                       @{ '(default)' = $Clsid }
+    Set-Key "$classes\CLSID\$Clsid"                        @{ '(default)' = $ClassName }
+    Set-Key "$classes\CLSID\$Clsid\ProgId"                 @{ '(default)' = $ProgId }
+    Set-Key "$classes\CLSID\$Clsid\InprocServer32"         $inproc
     Set-Key "$classes\CLSID\$Clsid\InprocServer32\1.0.0.0" $inproc
 }
 
-# Ключ надстройки Word. LoadBehavior=3 — загружать при старте.
+# Word add-in key. LoadBehavior = 3 means "load at startup".
 $addin = "HKCU:\Software\Microsoft\Office\Word\Addins\$ProgId"
 Set-Key $addin @{
     'FriendlyName'    = $FriendlyName
@@ -103,6 +103,6 @@ Set-Key $addin @{
 }
 
 Write-Host ''
-Write-Host 'Готово. Запустите Word — на ленте появится вкладка "Abbreviator".' -ForegroundColor Green
-Write-Host 'Если вкладки нет: Файл → Параметры → Надстройки → Надстройки COM → Перейти,' -ForegroundColor Yellow
-Write-Host 'и поставьте галочку у Abbreviator.' -ForegroundColor Yellow
+Write-Host 'Done. Start Word - the ribbon tab "Abbreviator" should appear.' -ForegroundColor Green
+Write-Host 'If it does not: File > Options > Add-ins > Manage: COM Add-ins > Go,' -ForegroundColor Yellow
+Write-Host 'then tick the Abbreviator checkbox.' -ForegroundColor Yellow

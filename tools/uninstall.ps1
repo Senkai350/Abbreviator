@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Удаляет регистрацию надстройки Abbreviator у текущего пользователя.
+    Removes the Abbreviator Word add-in registration for the current user.
 #>
 
 [CmdletBinding()]
@@ -22,10 +22,10 @@ $paths = @(
 foreach ($path in $paths) {
     if (Test-Path $path) {
         Remove-Item -Path $path -Recurse -Force
-        Write-Host "Удалено: $path"
+        Write-Host "Removed: $path"
     }
 }
 
 Write-Host ''
-Write-Host 'Надстройка отключена. Перезапустите Word.' -ForegroundColor Green
-Write-Host 'Настройки остались в %APPDATA%\Abbreviator — удалите папку, если они больше не нужны.' -ForegroundColor Yellow
+Write-Host 'Add-in unregistered. Restart Word.' -ForegroundColor Green
+Write-Host 'Settings are still in %APPDATA%\Abbreviator - delete the folder if not needed.' -ForegroundColor Yellow
