@@ -48,6 +48,7 @@ namespace Abbreviator.Core
                       RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private readonly AppSettings _settings;
+        private readonly List<Regex> _ignorePatterns = new List<Regex>();
 
         /// <summary>
         /// Внешняя проверка «это обычное слово, а не аббревиатура».
@@ -61,6 +62,19 @@ namespace Abbreviator.Core
         public AbbreviationRecognizer(AppSettings settings)
         {
             _settings = settings ?? new AppSettings();
+
+            foreach (var pattern in _settings.IgnorePatterns)
+            {
+                if (string.IsNullOrWhiteSpace(pattern)) continue;
+                try
+                {
+                    _ignorePatterns.Add(new Regex(pattern, RegexOptions.CultureInvariant));
+                }
+                catch (ArgumentException)
+                {
+                    // Ошибка в пользовательском выражении не должна ломать разбор.
+                }
+            }
         }
 
         /// <summary>Все аббревиатуры в строке.</summary>
@@ -68,10 +82,14 @@ namespace Abbreviator.Core
         {
             if (string.IsNullOrEmpty(text)) yield break;
 
+            var excluded = BuildExcludedSpans(text);
+
             foreach (Match m in Rx.Matches(text))
             {
                 var g = m.Groups["abbr"];
                 string abbr = g.Value;
+
+                if (InExcludedSpan(excluded, g.Index)) continue;
                 if (!IsAbbreviation(abbr)) continue;
 
                 yield return new TokenMatch
@@ -82,6 +100,30 @@ namespace Abbreviator.Core
                     Length = g.Length
                 };
             }
+        }
+
+        /// <summary>
+        /// Участки текста, внутри которых аббревиатуры не ищутся: обозначения
+        /// конструкторской документации вида ИЯУК.123456.789-01 и подобные.
+        /// Отсеиваются именно диапазоном, а не по одному токену, поэтому
+        /// производные формы обозначения тоже игнорируются целиком.
+        /// </summary>
+        private List<int[]> BuildExcludedSpans(string text)
+        {
+            var spans = new List<int[]>();
+            foreach (var rx in _ignorePatterns)
+            {
+                foreach (Match m in rx.Matches(text))
+                    if (m.Length > 0) spans.Add(new[] { m.Index, m.Index + m.Length });
+            }
+            return spans;
+        }
+
+        private static bool InExcludedSpan(List<int[]> spans, int index)
+        {
+            for (int i = 0; i < spans.Count; i++)
+                if (index >= spans[i][0] && index < spans[i][1]) return true;
+            return false;
         }
 
         /// <summary>Проверка одиночного токена (для контекстного меню).</summary>

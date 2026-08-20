@@ -102,6 +102,9 @@ namespace Abbreviator.Core
         public List<Occurrence> Occurrences = new List<Occurrence>();
         public List<DictEntry> Entries = new List<DictEntry>();
         public List<int> DictionaryPages = new List<int>();
+
+        /// <summary>Страницы содержания — пропускаются при разборе.</summary>
+        public List<int> TocPages = new List<int>();
         public Dictionary<string, AbbrInfo> ByAbbr =
             new Dictionary<string, AbbrInfo>(StringComparer.Ordinal);
 

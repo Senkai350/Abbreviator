@@ -32,6 +32,11 @@ namespace Abbreviator.Core
         // --- живая подсветка (оверлей, документ не изменяется) ---
         public bool LiveHighlight = true;
         public bool LiveShowKnown = true;
+        public int LiveIntervalMs = 150;
+
+        // --- страницы, которые пропускаются целиком ---
+        public bool SkipTableOfContents = true;
+        public bool AutoScanOnOpen = true;
 
         // --- перечень ---
         public string EntrySeparator = " - ";
@@ -50,6 +55,20 @@ namespace Abbreviator.Core
             "Принятые сокращения",
             "Условные обозначения и сокращения",
             "Список используемых сокращений"
+        };
+
+        /// <summary>
+        /// Участки текста, внутри которых аббревиатуры не ищутся.
+        /// По умолчанию — децимальные обозначения конструкторской документации
+        /// по ЕСКД: ИЯУК.123456.789, с исполнениями (-01) и шифром (ТУ, Э3).
+        /// Список — обычные регулярные выражения .NET, можно дополнять.
+        /// </summary>
+        public List<string> IgnorePatterns = new List<string>
+        {
+            // ИЯУК.123456.789, ИЯУК.123456.789-01-02, ИЯУК.123456.789 ТУ
+            @"[А-ЯЁA-Z]{4}\.\d{2,6}(?:\.\d{1,4})+(?:\s?[-–—]\s?[0-9А-ЯЁA-Z]{1,4})*(?:\s[А-ЯЁA-Z]{1,3}\d?)?",
+            // усечённые и производные формы: буквенный код, точка, цифры
+            @"[А-ЯЁA-Z]{3,6}\.\d{2,}(?:[-–—.][0-9А-ЯЁA-Z]+)*"
         };
 
         /// <summary>Слова, которые никогда не считаются аббревиатурами.</summary>
@@ -118,6 +137,9 @@ namespace Abbreviator.Core
                 s.HighlightIgnored = GetBool(map, "HighlightIgnored", s.HighlightIgnored);
                 s.LiveHighlight = GetBool(map, "LiveHighlight", s.LiveHighlight);
                 s.LiveShowKnown = GetBool(map, "LiveShowKnown", s.LiveShowKnown);
+                s.LiveIntervalMs = GetInt(map, "LiveIntervalMs", s.LiveIntervalMs);
+                s.SkipTableOfContents = GetBool(map, "SkipTableOfContents", s.SkipTableOfContents);
+                s.AutoScanOnOpen = GetBool(map, "AutoScanOnOpen", s.AutoScanOnOpen);
 
                 s.EntrySeparator = GetStr(map, "EntrySeparator", s.EntrySeparator);
                 s.KeepAlphabeticalOrder = GetBool(map, "KeepAlphabeticalOrder", s.KeepAlphabeticalOrder);
@@ -126,6 +148,10 @@ namespace Abbreviator.Core
                 var headers = GetStr(map, "HeaderVariants", null);
                 if (!string.IsNullOrWhiteSpace(headers))
                     s.HeaderVariants = SplitList(headers);
+
+                var patterns = GetStr(map, "IgnorePatterns", null);
+                if (!string.IsNullOrWhiteSpace(patterns))
+                    s.IgnorePatterns = SplitList(patterns);
 
                 var stop = GetStr(map, "StopWords", null);
                 if (!string.IsNullOrWhiteSpace(stop))
@@ -166,6 +192,9 @@ namespace Abbreviator.Core
                 sb.AppendLine("HighlightIgnored=" + Fmt(HighlightIgnored));
                 sb.AppendLine("LiveHighlight=" + Fmt(LiveHighlight));
                 sb.AppendLine("LiveShowKnown=" + Fmt(LiveShowKnown));
+                sb.AppendLine("LiveIntervalMs=" + LiveIntervalMs);
+                sb.AppendLine("SkipTableOfContents=" + Fmt(SkipTableOfContents));
+                sb.AppendLine("AutoScanOnOpen=" + Fmt(AutoScanOnOpen));
                 sb.AppendLine();
                 sb.AppendLine("[Dictionary]");
                 sb.AppendLine("EntrySeparator=" + EntrySeparator);
@@ -174,6 +203,7 @@ namespace Abbreviator.Core
                 sb.AppendLine("HeaderVariants=" + string.Join("|", HeaderVariants));
                 sb.AppendLine();
                 sb.AppendLine("[Lists]");
+                sb.AppendLine("IgnorePatterns=" + string.Join("|", IgnorePatterns));
                 sb.AppendLine("StopWords=" + string.Join("|", StopWords.OrderBy(x => x, StringComparer.Ordinal)));
                 sb.AppendLine("GlobalIgnored=" + string.Join("|", GlobalIgnored.OrderBy(x => x, StringComparer.Ordinal)));
 

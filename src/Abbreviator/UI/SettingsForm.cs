@@ -24,6 +24,8 @@ namespace Abbreviator.UI
         private readonly CheckBox _highlightDict;
         private readonly CheckBox _highlightIgnored;
         private readonly CheckBox _liveShowKnown;
+        private readonly CheckBox _skipToc;
+        private readonly CheckBox _autoScan;
 
         private readonly TextBox _separator;
         private readonly CheckBox _alphabetical;
@@ -47,12 +49,12 @@ namespace Abbreviator.UI
             MinimizeBox = false;
             MaximizeBox = false;
             ShowInTaskbar = false;
-            ClientSize = new Size(560, 624);
+            ClientSize = new Size(560, 672);
             Font = SystemFonts.MessageBoxFont;
 
             int y = 12;
 
-            Controls.Add(Group("Распознавание", 12, y, 536, 168));
+            Controls.Add(Group("Распознавание", 12, y, 536, 192));
             y += 26;
 
             Controls.Add(Lab("Минимум букв в сокращении:", 28, y + 3));
@@ -71,6 +73,10 @@ namespace Abbreviator.UI
 
             _skipCaps = Check("Пропускать заголовки, набранные ПРОПИСНЫМИ", 28, y, settings.SkipUpperCaseParagraphs);
             Controls.Add(_skipCaps);
+            y += 24;
+
+            _skipToc = Check("Пропускать страницы содержания (оглавления)", 28, y, settings.SkipTableOfContents);
+            Controls.Add(_skipToc);
             y += 26;
 
             _useSpell = Check("Отсеивать обычные слова проверкой орфографии Word", 28, y, settings.UseSpellCheckFilter);
@@ -107,7 +113,7 @@ namespace Abbreviator.UI
             Controls.Add(_liveShowKnown);
             y += 42;
 
-            Controls.Add(Group("Перечень", 12, y, 536, 150));
+            Controls.Add(Group("Перечень", 12, y, 536, 174));
             y += 26;
 
             Controls.Add(Lab("Разделитель статьи:", 28, y + 3));
@@ -133,6 +139,10 @@ namespace Abbreviator.UI
 
             _autoDetect = Check("Определять листы перечня автоматически при проверке", 28, y, settings.AutoDetectPagesOnScan);
             Controls.Add(_autoDetect);
+            y += 24;
+
+            _autoScan = Check("Искать перечень сразу при открытии документа", 28, y, settings.AutoScanOnOpen);
+            Controls.Add(_autoScan);
             y += 28;
 
             Controls.Add(Lab("Варианты заголовка (по одному в строке):", 28, y));
@@ -253,6 +263,7 @@ namespace Abbreviator.UI
             _settings.MaxLength = (int)_maxLength.Value;
             _settings.SkipRomanNumerals = _skipRoman.Checked;
             _settings.SkipUpperCaseParagraphs = _skipCaps.Checked;
+            _settings.SkipTableOfContents = _skipToc.Checked;
             _settings.UseSpellCheckFilter = _useSpell.Checked;
             _settings.SpellCheckMinLength = (int)_spellMin.Value;
 
@@ -265,6 +276,7 @@ namespace Abbreviator.UI
             _settings.EntrySeparator = string.IsNullOrEmpty(_separator.Text) ? " - " : _separator.Text;
             _settings.KeepAlphabeticalOrder = _alphabetical.Checked;
             _settings.AutoDetectPagesOnScan = _autoDetect.Checked;
+            _settings.AutoScanOnOpen = _autoScan.Checked;
 
             var headers = _headers.Lines
                 .Select(l => l.Trim())
@@ -285,6 +297,7 @@ namespace Abbreviator.UI
             _maxLength.Value = defaults.MaxLength;
             _skipRoman.Checked = defaults.SkipRomanNumerals;
             _skipCaps.Checked = defaults.SkipUpperCaseParagraphs;
+            _skipToc.Checked = defaults.SkipTableOfContents;
             _useSpell.Checked = defaults.UseSpellCheckFilter;
             _spellMin.Value = defaults.SpellCheckMinLength;
 
@@ -297,6 +310,7 @@ namespace Abbreviator.UI
             _separator.Text = defaults.EntrySeparator;
             _alphabetical.Checked = defaults.KeepAlphabeticalOrder;
             _autoDetect.Checked = defaults.AutoDetectPagesOnScan;
+            _autoScan.Checked = defaults.AutoScanOnOpen;
             _headers.Text = string.Join("\r\n", defaults.HeaderVariants);
         }
     }

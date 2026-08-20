@@ -2,18 +2,29 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Windows.Forms;
+using Abbreviator.Interop;
 
 namespace Abbreviator.UI
 {
     /// <summary>
-    /// Прозрачное окно поверх окна Word, на котором рисуются волнистые
-    /// подчёркивания — так же, как Word рисует орфографию: документ при этом
-    /// не меняется вовсе.
+    /// Прозрачное окно поверх окна Word: волнистые подчёркивания рисуются на
+    /// нём, а документ не изменяется вовсе — так же, как Word рисует
+    /// орфографию.
     ///
-    /// Окно не принимает ни фокус, ни клики (WS_EX_TRANSPARENT |
-    /// WS_EX_NOACTIVATE): мышь и клавиатура проходят сквозь него в Word,
-    /// поэтому правый клик по сокращению работает как обычно.
+    /// Окно слоёное (WS_EX_LAYERED) и обновляется через UpdateLayeredWindow:
+    /// кадр отдаётся системе целиком, без WM_PAINT и без затирания фона,
+    /// поэтому мерцания нет в принципе. Прозрачность — попиксельная (альфа),
+    /// а не по цветовому ключу, так что линии выходят сглаженными.
+    ///
+    /// WS_EX_TRANSPARENT | WS_EX_NOACTIVATE: окно не принимает ни фокус, ни
+    /// клики — мышь и клавиатура проходят сквозь него в Word, поэтому правый
+    /// клик по сокращению работает как обычно.
+    ///
+    /// Владельцем окна назначается окно Word (GWL_HWNDPARENT). Благодаря
+    /// этому оверлей всегда над Word, сворачивается вместе с ним и не
+    /// перекрывает другие приложения — TopMost для этого не нужен.
     /// </summary>
     public sealed class OverlayForm : Form
     {
@@ -23,34 +34,31 @@ namespace Abbreviator.UI
             public bool Known;
         }
 
-        private List<Mark> _marks = new List<Mark>();
-        private Rectangle _clip;
+        private const int WS_EX_TRANSPARENT = 0x00000020;
+        private const int WS_EX_TOOLWINDOW = 0x00000080;
+        private const int WS_EX_LAYERED = 0x00080000;
+        private const int WS_EX_NOACTIVATE = 0x08000000;
 
         private readonly Pen _knownPen;
         private readonly Pen _unknownPen;
 
-        private const int WS_EX_TRANSPARENT = 0x00000020;
-        private const int WS_EX_TOOLWINDOW = 0x00000080;
-        private const int WS_EX_NOACTIVATE = 0x08000000;
+        private Bitmap _frame;
+        private IntPtr _owner = IntPtr.Zero;
+        private bool _shown;
 
         public OverlayForm()
         {
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.Manual;
             ShowInTaskbar = false;
-            TopMost = true;
+            Visible = false;
 
-            // Цветовой ключ: фон этого цвета полностью прозрачен,
-            // непрозрачны только сами подчёркивания.
-            BackColor = Color.Magenta;
-            TransparencyKey = Color.Magenta;
-
-            SetStyle(ControlStyles.AllPaintingInWmPaint |
-                     ControlStyles.UserPaint |
-                     ControlStyles.OptimizedDoubleBuffer, true);
-
-            _knownPen = new Pen(Color.FromArgb(46, 155, 66), 1.6f);
-            _unknownPen = new Pen(Color.FromArgb(214, 56, 42), 1.6f);
+            // Цвета непрозрачные, сглаживание выключено: UpdateLayeredWindow
+            // ждёт альфу, умноженную на цвет, а GetHbitmap её не умножает.
+            // При полностью прозрачных и полностью непрозрачных пикселях
+            // умножение — тождество, поэтому ореола вокруг линий не будет.
+            _knownPen = new Pen(Color.FromArgb(255, 40, 150, 60), 1f);
+            _unknownPen = new Pen(Color.FromArgb(255, 214, 48, 34), 1f);
         }
 
         protected override bool ShowWithoutActivation
@@ -63,66 +71,105 @@ namespace Abbreviator.UI
             get
             {
                 CreateParams cp = base.CreateParams;
-                cp.ExStyle |= WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+                cp.ExStyle |= WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
                 return cp;
             }
         }
 
-        /// <summary>
-        /// Обновляет оверлей: положение поверх окна Word, область отсечения
-        /// (панель документа) и список подчёркиваний в экранных координатах.
-        /// </summary>
-        public void UpdateMarks(Rectangle wordWindow, Rectangle documentPane, List<Mark> marks)
+        /// <summary>Привязать оверлей к окну Word как к окну-владельцу.</summary>
+        public void AttachTo(IntPtr wordWindow)
         {
-            if (Bounds != wordWindow) Bounds = wordWindow;
+            if (wordWindow == _owner) return;
+            _owner = wordWindow;
+            NativeMethods.SetWindowLongPtr(Handle, NativeMethods.GWL_HWNDPARENT, wordWindow);
+        }
 
-            // Экранные координаты -> координаты клиентской области оверлея.
-            var clip = documentPane;
-            clip.Offset(-wordWindow.X, -wordWindow.Y);
+        /// <summary>
+        /// Отрисовать кадр: положение окна — панель документа Word,
+        /// подчёркивания заданы в экранных координатах.
+        /// </summary>
+        public void Render(Rectangle pane, List<Mark> marks)
+        {
+            if (pane.Width <= 0 || pane.Height <= 0) { HideOverlay(); return; }
 
-            var local = new List<Mark>(marks.Count);
-            foreach (var m in marks)
+            if (_frame == null || _frame.Width != pane.Width || _frame.Height != pane.Height)
             {
-                var r = m.Rect;
-                r.Offset(-wordWindow.X, -wordWindow.Y);
-                if (r.IntersectsWith(clip))
-                    local.Add(new Mark { Rect = r, Known = m.Known });
+                if (_frame != null) _frame.Dispose();
+                _frame = new Bitmap(pane.Width, pane.Height, PixelFormat.Format32bppArgb);
             }
 
-            bool changed = clip != _clip || !SameMarks(local, _marks);
-            _clip = clip;
-            _marks = local;
+            using (var g = Graphics.FromImage(_frame))
+            {
+                g.Clear(Color.Transparent);
+                g.SmoothingMode = SmoothingMode.None;
 
-            if (!Visible) Show();
-            if (changed) Invalidate();
+                foreach (var m in marks)
+                {
+                    var r = m.Rect;
+                    r.Offset(-pane.X, -pane.Y);           // экран -> холст кадра
+                    DrawWave(g, r, m.Known ? _knownPen : _unknownPen);
+                }
+            }
+
+            Push(pane);
         }
 
         public void HideOverlay()
         {
-            if (Visible) Hide();
+            if (!_shown) return;
+            _shown = false;
+            if (IsHandleCreated) NativeMethods.ShowWindow(Handle, NativeMethods.SW_HIDE);
         }
 
-        private static bool SameMarks(List<Mark> a, List<Mark> b)
+        // ------------------------------------------------------------------
+
+        /// <summary>Отдать готовый кадр системе одним вызовом.</summary>
+        private void Push(Rectangle pane)
         {
-            if (a.Count != b.Count) return false;
-            for (int i = 0; i < a.Count; i++)
-                if (a[i].Rect != b[i].Rect || a[i].Known != b[i].Known) return false;
-            return true;
+            IntPtr screenDc = NativeMethods.GetDC(IntPtr.Zero);
+            IntPtr memDc = NativeMethods.CreateCompatibleDC(screenDc);
+            IntPtr bitmap = IntPtr.Zero;
+            IntPtr previous = IntPtr.Zero;
+
+            try
+            {
+                bitmap = _frame.GetHbitmap(Color.FromArgb(0));
+                previous = NativeMethods.SelectObject(memDc, bitmap);
+
+                var size = new NativeMethods.SIZE(pane.Width, pane.Height);
+                var destination = new NativeMethods.POINT(pane.X, pane.Y);
+                var source = new NativeMethods.POINT(0, 0);
+                var blend = new NativeMethods.BLENDFUNCTION
+                {
+                    BlendOp = NativeMethods.AC_SRC_OVER,
+                    BlendFlags = 0,
+                    SourceConstantAlpha = 255,
+                    AlphaFormat = NativeMethods.AC_SRC_ALPHA
+                };
+
+                NativeMethods.UpdateLayeredWindow(Handle, screenDc, ref destination, ref size,
+                                                  memDc, ref source, 0, ref blend,
+                                                  NativeMethods.ULW_ALPHA);
+
+                if (!_shown)
+                {
+                    _shown = true;
+                    NativeMethods.ShowWindow(Handle, NativeMethods.SW_SHOWNOACTIVATE);
+                }
+            }
+            finally
+            {
+                NativeMethods.ReleaseDC(IntPtr.Zero, screenDc);
+                if (bitmap != IntPtr.Zero)
+                {
+                    NativeMethods.SelectObject(memDc, previous);
+                    NativeMethods.DeleteObject(bitmap);
+                }
+                NativeMethods.DeleteDC(memDc);
+            }
         }
 
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-            if (_marks.Count == 0) return;
-
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            e.Graphics.SetClip(_clip);
-
-            foreach (var m in _marks)
-                DrawWave(e.Graphics, m.Rect, m.Known ? _knownPen : _unknownPen);
-        }
-
-        /// <summary>Волнистая линия под нижней кромкой прямоугольника текста.</summary>
+        /// <summary>Волнистая линия под нижней кромкой текста.</summary>
         private static void DrawWave(Graphics g, Rectangle rect, Pen pen)
         {
             if (rect.Width < 4) return;
@@ -131,7 +178,6 @@ namespace Abbreviator.UI
             int x = rect.Left;
             int end = rect.Right;
 
-            // Зигзаг с шагом 3 и амплитудой 2 — визуально как у проверки орфографии.
             var points = new List<Point>();
             bool up = true;
             while (x <= end)
@@ -141,8 +187,7 @@ namespace Abbreviator.UI
                 x += 3;
             }
 
-            if (points.Count >= 2)
-                g.DrawLines(pen, points.ToArray());
+            if (points.Count >= 2) g.DrawLines(pen, points.ToArray());
         }
 
         protected override void Dispose(bool disposing)
@@ -151,6 +196,7 @@ namespace Abbreviator.UI
             {
                 _knownPen.Dispose();
                 _unknownPen.Dispose();
+                if (_frame != null) _frame.Dispose();
             }
             base.Dispose(disposing);
         }

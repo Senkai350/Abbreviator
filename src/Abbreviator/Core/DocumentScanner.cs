@@ -39,6 +39,16 @@ namespace Abbreviator.Core
 
             TextModel model = TextModel.Build(doc);
 
+            // --- 0. Страницы содержания ------------------------------------
+            // В содержании встречается строка «Перечень принятых сокращений»,
+            // поэтому такие страницы исключаются и из поиска заголовка, и из
+            // поиска аббревиатур.
+            TocDetector toc = _settings.SkipTableOfContents
+                ? TocDetector.Build(doc, model, pageBounds)
+                : new TocDetector();
+            parser.Toc = toc;
+            result.TocPages = new List<int>(toc.Pages);
+
             // --- 1. Страницы перечня ---------------------------------------
             int headerStart, headerPage;
             var detected = parser.DetectPages(model, pageBounds, out headerStart, out headerPage);
@@ -73,6 +83,13 @@ namespace Abbreviator.Core
             {
                 if (p.IsEmpty) continue;
                 if (recognizer.IsUpperCaseHeading(p.Text)) continue;
+
+                if (_settings.SkipTableOfContents)
+                {
+                    int paraPage = WordUtil.PageByPosition(pageBounds, p.Start);
+                    if (toc.IsTocPage(paraPage) || toc.IsInToc(p.Start)) continue;
+                    if (TocDetector.LooksLikeTocLine(p.Text)) continue;
+                }
 
                 foreach (var token in recognizer.Find(p.Raw))
                 {

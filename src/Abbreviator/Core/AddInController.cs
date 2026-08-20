@@ -18,8 +18,8 @@ namespace Abbreviator.Core
         private readonly Dictionary<string, DocumentState> _states =
             new Dictionary<string, DocumentState>(StringComparer.OrdinalIgnoreCase);
 
-        private readonly Dictionary<string, KnownIndex> _indexes =
-            new Dictionary<string, KnownIndex>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, DocIndex> _indexes =
+            new Dictionary<string, DocIndex>(StringComparer.OrdinalIgnoreCase);
 
         private Target _cachedTarget;
         private DateTime _cachedTargetAt = DateTime.MinValue;
@@ -38,14 +38,17 @@ namespace Abbreviator.Core
         public AddInController(dynamic app)
         {
             App = app;
+
+            // Таймер работает всегда: помимо подсветки он замечает смену
+            // активного документа и запускает автоопределение листов перечня.
             _live = new LiveCheck(this);
-            if (Settings.LiveHighlight) _live.Start();
+            _live.Start();
         }
 
         /// <summary>Включена ли живая подсветка (волнистые подчёркивания поверх окна).</summary>
         public bool LiveEnabled
         {
-            get { return _live != null && _live.Enabled; }
+            get { return Settings.LiveHighlight; }
         }
 
         public void SetLiveEnabled(bool enabled)
@@ -53,8 +56,8 @@ namespace Abbreviator.Core
             Settings.LiveHighlight = enabled;
             Settings.Save();
             if (_live == null) return;
-            if (enabled) { _live.Invalidate(); _live.Start(); }
-            else _live.Stop();
+            if (enabled) _live.Invalidate();
+            else _live.HideMarks();
         }
 
         public void Shutdown()
@@ -298,11 +301,22 @@ namespace Abbreviator.Core
         // Индекс принятых сокращений (лёгкий разбор, только перечень)
         // ==================================================================
 
-        private sealed class KnownIndex
+        /// <summary>
+        /// Разобранные сведения о документе, нужные и контекстному меню, и
+        /// живой подсветке: перечень, его страницы и страницы содержания.
+        /// </summary>
+        public sealed class DocIndex
         {
-            public Dictionary<string, DictEntry> Entries;
-            public int ContentEnd;
-            public int PagesHash;
+            public Dictionary<string, DictEntry> Known =
+                new Dictionary<string, DictEntry>(StringComparer.Ordinal);
+
+            /// <summary>Диапазоны страниц перечня.</summary>
+            public List<int[]> DictionaryRanges = new List<int[]>();
+
+            public TocDetector Toc = new TocDetector();
+
+            internal int ContentEnd = -1;
+            internal int PagesHash;
         }
 
         /// <summary>
@@ -311,39 +325,111 @@ namespace Abbreviator.Core
         /// </summary>
         public Dictionary<string, DictEntry> GetKnownIndex(dynamic doc, DocumentState state)
         {
-            var empty = new Dictionary<string, DictEntry>(StringComparer.Ordinal);
-            if (doc == null) return empty;
+            return GetIndex(doc, state).Known;
+        }
+
+        /// <summary>
+        /// Разбор перечня и содержания без полного сканирования документа.
+        /// Кэш сбрасывается, когда меняется длина документа или список листов.
+        /// </summary>
+        public DocIndex GetIndex(dynamic doc, DocumentState state)
+        {
+            if (doc == null) return new DocIndex();
 
             string key = KeyOf(doc);
             int contentEnd = WordUtil.ContentEnd(doc);
             int pagesHash = string.Join(",", state.DictionaryPages).GetHashCode();
 
-            KnownIndex cached;
+            DocIndex cached;
             if (_indexes.TryGetValue(key, out cached) &&
                 cached.ContentEnd == contentEnd && cached.PagesHash == pagesHash)
-                return cached.Entries;
+                return cached;
 
-            var map = new Dictionary<string, DictEntry>(StringComparer.Ordinal);
+            var index = new DocIndex { ContentEnd = contentEnd, PagesHash = pagesHash };
+
+            AbbreviationRecognizer recognizer = new DocumentScanner(Settings).CreateRecognizer(App);
+            var parser = new DictionaryParser(Settings, recognizer);
+            TextModel model = TextModel.Build(doc);
+
+            if (Settings.SkipTableOfContents)
+            {
+                List<int[]> allPages = WordUtil.PageBounds(doc);
+                index.Toc = TocDetector.Build(doc, model, allPages);
+                parser.Toc = index.Toc;
+            }
 
             if (state.DictionaryPages.Count > 0)
             {
-                AbbreviationRecognizer recognizer = new DocumentScanner(Settings).CreateRecognizer(App);
-                var parser = new DictionaryParser(Settings, recognizer);
                 List<int[]> bounds = WordUtil.PageBoundsFor(doc, state.DictionaryPages);
-                TextModel model = TextModel.Build(doc);
 
                 foreach (var e in parser.ParseEntries(model, bounds, state.DictionaryPages))
                     foreach (var term in e.Terms)
-                        if (!map.ContainsKey(term)) map[term] = e;
+                        if (!index.Known.ContainsKey(term)) index.Known[term] = e;
+
+                foreach (int page in state.DictionaryPages)
+                {
+                    int[] b = WordUtil.BoundsOfPage(bounds, page);
+                    if (b != null && b[1] > b[0]) index.DictionaryRanges.Add(b);
+                }
             }
 
-            _indexes[key] = new KnownIndex
+            _indexes[key] = index;
+            return index;
+        }
+
+        // ==================================================================
+        // Автоматическое определение перечня при открытии документа
+        // ==================================================================
+
+        private string _lastSeenDocument;
+        private readonly HashSet<string> _autoScanned =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Вызывается по таймеру. Когда активным становится другой документ и
+        /// листы перечня для него ещё не заданы, они определяются сами.
+        ///
+        /// Сделано опросом, а не событием DocumentOpen: подписка на события
+        /// Word при позднем связывании требует точек соединения, а таймер для
+        /// живой подсветки всё равно работает.
+        /// </summary>
+        public void PollActiveDocument()
+        {
+            dynamic doc = ActiveDocument;
+            if (doc == null) { _lastSeenDocument = null; return; }
+
+            string key = KeyOf(doc);
+            if (key == _lastSeenDocument) return;
+            _lastSeenDocument = key;
+
+            if (!Settings.AutoScanOnOpen) return;
+            if (_autoScanned.Contains(key)) return;
+            _autoScanned.Add(key);
+
+            DocumentState state = GetState(doc);
+            if (state.DictionaryPages.Count > 0) return;   // уже настроено вручную
+
+            try
             {
-                Entries = map,
-                ContentEnd = contentEnd,
-                PagesHash = pagesHash
-            };
-            return map;
+                PageDetection detection = AutoDetectPages(doc, state);
+                if (!detection.Found)
+                {
+                    Diag.Write("Автоопределение: перечень не найден в " + key);
+                    return;
+                }
+
+                state.SetPages(detection.Pages);
+                state.Save(doc);
+                _indexes.Remove(key);
+
+                Diag.Write("Автоопределение: перечень на странице " + detection.HeaderPage +
+                           ", листы " + string.Join(",", detection.Pages));
+                RefreshMainForm();
+            }
+            catch (Exception ex)
+            {
+                Diag.Error("автоопределение перечня при открытии", ex);
+            }
         }
 
         // ==================================================================

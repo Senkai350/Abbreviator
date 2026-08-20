@@ -27,10 +27,28 @@ namespace Abbreviator.Core
         private readonly AppSettings _settings;
         private readonly AbbreviationRecognizer _recognizer;
 
+        /// <summary>
+        /// Страницы содержания. В содержании есть строка «Перечень принятых
+        /// сокращений», и без этой проверки она принималась бы за заголовок
+        /// самого перечня.
+        /// </summary>
+        public TocDetector Toc;
+
         public DictionaryParser(AppSettings settings, AbbreviationRecognizer recognizer)
         {
             _settings = settings ?? new AppSettings();
             _recognizer = recognizer;
+        }
+
+        /// <summary>Абзац лежит в содержании и должен пропускаться.</summary>
+        private bool InToc(ParaSpan p, List<int[]> pageBounds)
+        {
+            if (!_settings.SkipTableOfContents || Toc == null) return false;
+            if (Toc.IsInToc(p.Start)) return true;
+            if (TocDetector.LooksLikeTocLine(p.Text)) return true;
+
+            int page = WordUtil.PageByPosition(pageBounds, p.Start);
+            return page > 0 && Toc.IsTocPage(page);
         }
 
         // ------------------------------------------------------------------
@@ -44,6 +62,15 @@ namespace Abbreviator.Core
         /// </summary>
         public int FindHeaderParagraph(TextModel model)
         {
+            return FindHeaderParagraph(model, null);
+        }
+
+        /// <summary>
+        /// Индекс абзаца с заголовком перечня или -1.
+        /// Абзацы на страницах содержания пропускаются.
+        /// </summary>
+        public int FindHeaderParagraph(TextModel model, List<int[]> pageBounds)
+        {
             var variants = _settings.HeaderVariants
                 .Select(WordUtil.NormalizeForCompare)
                 .Where(v => v.Length > 0)
@@ -54,7 +81,10 @@ namespace Abbreviator.Core
 
             for (int i = 0; i < model.Paragraphs.Count; i++)
             {
-                var norm = WordUtil.NormalizeForCompare(model.Paragraphs[i].Text);
+                var para = model.Paragraphs[i];
+                if (InToc(para, pageBounds)) continue;
+
+                var norm = WordUtil.NormalizeForCompare(para.Text);
                 if (norm.Length == 0) continue;
 
                 foreach (var v in variants)
@@ -85,7 +115,7 @@ namespace Abbreviator.Core
             headerPage = 0;
 
             var pages = new List<int>();
-            int headerIndex = FindHeaderParagraph(model);
+            int headerIndex = FindHeaderParagraph(model, pageBounds);
             if (headerIndex < 0) return pages;
 
             var header = model.Paragraphs[headerIndex];
@@ -128,7 +158,11 @@ namespace Abbreviator.Core
             if (headerPage <= 0) headerPage = 1;
             if (lastPage < headerPage) lastPage = headerPage;
 
-            for (int p = headerPage; p <= lastPage; p++) pages.Add(p);
+            for (int p = headerPage; p <= lastPage; p++)
+            {
+                if (_settings.SkipTableOfContents && Toc != null && Toc.IsTocPage(p)) continue;
+                pages.Add(p);
+            }
             return pages;
         }
 
@@ -192,6 +226,7 @@ namespace Abbreviator.Core
                 }
 
                 if (p.IsEmpty) continue;
+                if (_settings.SkipTableOfContents && TocDetector.LooksLikeTocLine(p.Text)) continue;
 
                 var entry = ParseParagraph(p, page);
                 if (entry != null) sink.Add(entry);
