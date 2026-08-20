@@ -102,6 +102,23 @@ Set-Key $addin @{
     'CommandLineSafe' = 0
 }
 
+# After a failed load Word moves the add-in to "Disabled Items" and keeps it
+# there even once the problem is fixed. Clear that list so the add-in gets
+# another chance on the next start.
+$cleared = 0
+Get-ChildItem 'HKCU:\Software\Microsoft\Office' -ErrorAction SilentlyContinue |
+    Where-Object { $_.PSChildName -match '^\d+\.\d+$' } |
+    ForEach-Object {
+        foreach ($leaf in @('DisabledItems', 'CrashingAddinList')) {
+            $path = Join-Path $_.PSPath "Word\Resiliency\$leaf"
+            if (Test-Path $path) {
+                Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Host "Cleared: $($_.PSChildName) Word\Resiliency\$leaf"
+                $cleared++
+            }
+        }
+    }
+
 Write-Host ''
 Write-Host 'Done. Start Word - the ribbon tab "Abbreviator" should appear.' -ForegroundColor Green
 Write-Host 'If it does not: File > Options > Add-ins > Manage: COM Add-ins > Go,' -ForegroundColor Yellow

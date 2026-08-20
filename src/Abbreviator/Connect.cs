@@ -25,6 +25,13 @@ namespace Abbreviator
         private AddInController _controller;
         private dynamic _ribbon;
 
+        public Connect()
+        {
+            // Первая точка, куда попадает управление: если в журнале нет даже
+            // этой строки, COM-объект вообще не был создан — дело в регистрации.
+            Diag.Write("Connect: объект создан");
+        }
+
         // ==================================================================
         // IDTExtensibility2
         // ==================================================================
@@ -34,16 +41,23 @@ namespace Abbreviator
         {
             try
             {
+                Diag.Write("OnConnection: режим " + connectMode);
+                Diag.WriteHeader(application);
+
                 _controller = new AddInController(application);
+
+                Diag.Write("OnConnection: надстройка загружена");
             }
             catch (Exception ex)
             {
+                Diag.Error("OnConnection", ex);
                 Report("Не удалось загрузить надстройку", ex);
             }
         }
 
         public void OnDisconnection(ext_DisconnectMode removeMode, ref Array custom)
         {
+            Diag.Write("OnDisconnection: режим " + removeMode);
             try
             {
                 if (_controller != null) _controller.Shutdown();
@@ -70,20 +84,37 @@ namespace Abbreviator
         {
             try
             {
+                Diag.Write("GetCustomUI: запрошена разметка для " + ribbonID);
+
                 var assembly = Assembly.GetExecutingAssembly();
                 string name = assembly.GetManifestResourceNames()
                     .FirstOrDefault(n => n.EndsWith("Ribbon.xml", StringComparison.OrdinalIgnoreCase));
-                if (name == null) return string.Empty;
+
+                if (name == null)
+                {
+                    Diag.Error("GetCustomUI: ресурс Ribbon.xml не найден в сборке", null);
+                    return string.Empty;
+                }
 
                 using (var stream = assembly.GetManifestResourceStream(name))
                 {
-                    if (stream == null) return string.Empty;
+                    if (stream == null)
+                    {
+                        Diag.Error("GetCustomUI: поток ресурса " + name + " пуст", null);
+                        return string.Empty;
+                    }
+
                     using (var reader = new StreamReader(stream))
-                        return reader.ReadToEnd();
+                    {
+                        string xml = reader.ReadToEnd();
+                        Diag.Write("GetCustomUI: отдано " + xml.Length + " символов");
+                        return xml;
+                    }
                 }
             }
             catch (Exception ex)
             {
+                Diag.Error("GetCustomUI", ex);
                 Report("Не удалось загрузить разметку ленты", ex);
                 return string.Empty;
             }
@@ -91,6 +122,7 @@ namespace Abbreviator
 
         public void OnRibbonLoad(object ribbonUI)
         {
+            Diag.Write("OnRibbonLoad: лента построена");
             _ribbon = ribbonUI;
         }
 
@@ -170,53 +202,68 @@ namespace Abbreviator
 
         public bool GetAddVisible(object control)
         {
-            var t = CurrentTarget;
-            return t.HasValue && t.Status != AbbrStatus.Known;
+            return Run(() =>
+            {
+                var t = CurrentTarget;
+                return t.HasValue && t.Status != AbbrStatus.Known;
+            }, false);
         }
 
         public string GetAddLabel(object control)
         {
-            var t = CurrentTarget;
-            return "Abbreviator: добавить «" + (t.Abbr ?? string.Empty) + "» в перечень…";
+            return Run(() => "Abbreviator: добавить «" + (CurrentTarget.Abbr ?? string.Empty) +
+                             "» в перечень…", "Abbreviator: добавить в перечень…");
         }
 
         public bool GetIgnoreVisible(object control)
         {
-            var t = CurrentTarget;
-            return t.HasValue && t.Status != AbbrStatus.Ignored;
+            return Run(() =>
+            {
+                var t = CurrentTarget;
+                return t.HasValue && t.Status != AbbrStatus.Ignored;
+            }, false);
         }
 
         public string GetIgnoreLabel(object control)
         {
-            var t = CurrentTarget;
-            string suffix = t.UsageCount == 1 ? " (используется 1 раз)"
-                          : t.UsageCount > 1 ? " (используется " + t.UsageCount + " раз)"
-                          : string.Empty;
-            return "Abbreviator: игнорировать «" + (t.Abbr ?? string.Empty) + "»" + suffix;
+            return Run(() =>
+            {
+                var t = CurrentTarget;
+                string suffix = t.UsageCount == 1 ? " (используется 1 раз)"
+                              : t.UsageCount > 1 ? " (используется " + t.UsageCount + " раз)"
+                              : string.Empty;
+                return "Abbreviator: игнорировать «" + (t.Abbr ?? string.Empty) + "»" + suffix;
+            }, "Abbreviator: игнорировать");
         }
 
         public bool GetUnignoreVisible(object control)
         {
-            var t = CurrentTarget;
-            return t.HasValue && t.Status == AbbrStatus.Ignored;
+            return Run(() =>
+            {
+                var t = CurrentTarget;
+                return t.HasValue && t.Status == AbbrStatus.Ignored;
+            }, false);
         }
 
         public string GetUnignoreLabel(object control)
         {
-            var t = CurrentTarget;
-            return "Abbreviator: не игнорировать «" + (t.Abbr ?? string.Empty) + "»";
+            return Run(() => "Abbreviator: не игнорировать «" + (CurrentTarget.Abbr ?? string.Empty) + "»",
+                       "Abbreviator: не игнорировать");
         }
 
         public bool GetGotoVisible(object control)
         {
-            var t = CurrentTarget;
-            return t.HasValue && t.Status == AbbrStatus.Known && t.EntryStart >= 0;
+            return Run(() =>
+            {
+                var t = CurrentTarget;
+                return t.HasValue && t.Status == AbbrStatus.Known && t.EntryStart >= 0;
+            }, false);
         }
 
         public string GetGotoLabel(object control)
         {
-            var t = CurrentTarget;
-            return "Abbreviator: показать «" + (t.Abbr ?? string.Empty) + "» в перечне";
+            return Run(() => "Abbreviator: показать «" + (CurrentTarget.Abbr ?? string.Empty) + "» в перечне",
+                       "Abbreviator: показать в перечне");
         }
 
         public void OnCtxAdd(object control) { Run(() => _controller.AddTargetToDictionary()); }
@@ -239,14 +286,39 @@ namespace Abbreviator
 
         private void Run(Action action)
         {
-            if (_controller == null) return;
+            if (_controller == null)
+            {
+                Diag.Error("команда вызвана, но надстройка не инициализирована", null);
+                return;
+            }
+
             try
             {
                 action();
             }
             catch (Exception ex)
             {
+                Diag.Error("выполнение команды", ex);
                 Report("Ошибка Abbreviator", ex);
+            }
+        }
+
+        /// <summary>
+        /// Обёртка для обратных вызовов, возвращающих значение: исключение,
+        /// улетевшее в Word, приводит к отключению надстройки.
+        /// </summary>
+        private T Run<T>(Func<T> action, T fallback)
+        {
+            if (_controller == null) return fallback;
+
+            try
+            {
+                return action();
+            }
+            catch (Exception ex)
+            {
+                Diag.Error("обратный вызов контекстного меню", ex);
+                return fallback;
             }
         }
 
@@ -254,8 +326,9 @@ namespace Abbreviator
         {
             try
             {
-                MessageBox.Show(title + ":\r\n\r\n" + ex.Message, "Abbreviator",
-                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(title + ":\r\n\r\n" + ex.Message +
+                                "\r\n\r\nПодробности: " + Diag.LogPath,
+                                "Abbreviator", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch { }
         }

@@ -3,7 +3,23 @@ using System.Runtime.InteropServices;
 
 namespace Abbreviator.Interop
 {
+    // ВАЖНО про атрибуты в этом файле.
+    //
+    // Интерфейсы объявлены БЕЗ [ComImport]. ComImport означает «интерфейс
+    // реализован COM-объектом, а мы его вызываем»; для такого интерфейса CLR не
+    // умеет построить ITypeInfo, и IDispatch::GetIDsOfNames по нему падает.
+    // Здесь всё наоборот: интерфейсы реализует управляемый класс, а вызывает их
+    // Word. Поэтому нужны обычные управляемые интерфейсы с [Guid] и
+    // InterfaceIsDual — ровно так они объявлены в Extensibility.dll и office.dll.
+    //
+    // [ComVisible(true)] обязателен на каждом типе: сборка помечена
+    // ComVisible(false), а типы из сигнатур публичных методов класса Connect
+    // (он AutoDual) должны быть видимы COM, иначе CCW для него не создаётся
+    // и Word сообщает «произошла ошибка с надстройкой».
+
     /// <summary>Режим подключения надстройки (Extensibility.ext_ConnectMode).</summary>
+    [ComVisible(true)]
+    [Guid("B8DA6310-E19B-11D4-BED5-00B0D0A1F19A")]
     public enum ext_ConnectMode
     {
         ext_cm_AfterStartup = 0,
@@ -14,6 +30,8 @@ namespace Abbreviator.Interop
     }
 
     /// <summary>Режим отключения надстройки (Extensibility.ext_DisconnectMode).</summary>
+    [ComVisible(true)]
+    [Guid("B8DA6311-E19B-11D4-BED5-00B0D0A1F19A")]
     public enum ext_DisconnectMode
     {
         ext_dm_HostShutdown = 0,
@@ -23,10 +41,10 @@ namespace Abbreviator.Interop
     }
 
     /// <summary>
-    /// Интерфейс COM-надстройки Office. Объявлен вручную, чтобы не тянуть Extensibility.dll.
-    /// Порядок методов менять нельзя — он совпадает с vtable оригинального интерфейса.
+    /// Интерфейс COM-надстройки Office. Объявлен вручную, чтобы не тянуть
+    /// Extensibility.dll. Порядок методов менять нельзя — он задаёт vtable.
     /// </summary>
-    [ComImport]
+    [ComVisible(true)]
     [Guid("B65AD801-ABAF-11D0-BB8B-00A0C90F2744")]
     [InterfaceType(ComInterfaceType.InterfaceIsDual)]
     public interface IDTExtensibility2
@@ -54,7 +72,7 @@ namespace Abbreviator.Interop
     /// <summary>
     /// Office.IRibbonExtensibility. Объявлен вручную, чтобы не зависеть от Office PIA.
     /// </summary>
-    [ComImport]
+    [ComVisible(true)]
     [Guid("000C0396-0000-0000-C000-000000000046")]
     [InterfaceType(ComInterfaceType.InterfaceIsDual)]
     public interface IRibbonExtensibility
