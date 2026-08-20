@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Abbreviator</RootNamespace>
+    <AssemblyName>Abbreviator</AssemblyName>
+    <LangVersion>7.3</LangVersion>
+    <ComVisible>false</ComVisible>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.0</Version>
+    <Company>Abbreviator</Company>
+    <Product>Abbreviator</Product>
+    <Description>Word add-in: поиск аббревиатур и сверка с перечнем принятых сокращений</Description>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    Никаких COM-ссылок и PIA: весь Word OM вызывается позднее связывание (dynamic).
+    Из-за этого проект собирается на любой машине с .NET SDK + пакетом таргетинга
+    .NET Framework 4.8, даже если Office на ней не установлен.
+  -->
+  <!--
+    System.Windows.Forms в набор ссылок по умолчанию для .NET Framework не входит.
+    Остальное (System, System.Core, System.Drawing, Microsoft.CSharp) SDK
+    подставляет сам, поэтому здесь не перечисляется.
+  -->
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Ribbon\Ribbon.xml" />
+  </ItemGroup>
+
+</Project>

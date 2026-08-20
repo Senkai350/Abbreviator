@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="OnRibbonLoad">
+
+  <ribbon>
+    <tabs>
+      <tab id="AbbrTab" label="Abbreviator" insertAfterMso="TabHome">
+
+        <group id="AbbrGroupCheck" label="Проверка">
+          <button id="AbbrCheck"
+                  label="Проверить документ"
+                  size="large"
+                  onAction="OnCheck"
+                  screentip="Проверить документ"
+                  supertip="Найти все аббревиатуры и подсветить их: зелёным — те, что есть в перечне принятых сокращений, красным — те, которых в нём нет."/>
+          <button id="AbbrClear"
+                  label="Снять подсветку"
+                  onAction="OnClear"
+                  screentip="Снять подсветку"
+                  supertip="Убрать фон только с найденных аббревиатур."/>
+          <button id="AbbrClearAll"
+                  label="Снять всю подсветку"
+                  onAction="OnClearAll"
+                  screentip="Снять всю подсветку"
+                  supertip="Убрать фон во всём документе, включая расставленный вручную."/>
+        </group>
+
+        <group id="AbbrGroupDict" label="Перечень сокращений">
+          <button id="AbbrPages"
+                  label="Листы перечня"
+                  size="large"
+                  onAction="OnPages"
+                  screentip="Листы перечня принятых сокращений"
+                  supertip="Список страниц, с которых берутся принятые сокращения. Перечень может продолжаться на нескольких страницах — добавьте их все."/>
+          <button id="AbbrDetect"
+                  label="Определить листы"
+                  onAction="OnDetect"
+                  screentip="Определить листы автоматически"
+                  supertip="Найти заголовок «Перечень принятых сокращений» и все страницы раздела."/>
+          <button id="AbbrGotoDict"
+                  label="Перейти к перечню"
+                  onAction="OnGotoDict"/>
+        </group>
+
+        <group id="AbbrGroupList" label="Сокращения">
+          <button id="AbbrList"
+                  label="Найденные сокращения"
+                  size="large"
+                  onAction="OnList"
+                  screentip="Список найденных сокращений"
+                  supertip="Все аббревиатуры документа с их статусом и числом употреблений."/>
+          <button id="AbbrIgnoreList"
+                  label="Игнорируемые…"
+                  onAction="OnIgnoreList"/>
+        </group>
+
+        <group id="AbbrGroupMisc" label="Прочее">
+          <button id="AbbrSettings" label="Настройки…" onAction="OnSettings"/>
+          <button id="AbbrSettingsFile" label="Файл настроек" onAction="OnSettingsFile"/>
+          <button id="AbbrAbout" label="О надстройке" onAction="OnAbout"/>
+        </group>
+
+      </tab>
+    </tabs>
+  </ribbon>
+
+  <contextMenus>
+
+    <!-- Правый клик по обычному тексту -->
+    <contextMenu idMso="ContextMenuText">
+      <menuSeparator id="AbbrCtxSep"/>
+      <button id="AbbrCtxAdd"      getLabel="GetAddLabel"      getVisible="GetAddVisible"      onAction="OnCtxAdd"/>
+      <button id="AbbrCtxIgnore"   getLabel="GetIgnoreLabel"   getVisible="GetIgnoreVisible"   onAction="OnCtxIgnore"/>
+      <button id="AbbrCtxUnignore" getLabel="GetUnignoreLabel" getVisible="GetUnignoreVisible" onAction="OnCtxUnignore"/>
+      <button id="AbbrCtxGoto"     getLabel="GetGotoLabel"     getVisible="GetGotoVisible"     onAction="OnCtxGoto"/>
+      <menu id="AbbrCtxMenu" label="Abbreviator">
+        <button id="AbbrCtxCheck"      label="Проверить документ"      onAction="OnCheck"/>
+        <button id="AbbrCtxClear"      label="Снять подсветку"         onAction="OnClear"/>
+        <button id="AbbrCtxPages"      label="Листы перечня…"          onAction="OnPages"/>
+        <button id="AbbrCtxList"       label="Найденные сокращения…"   onAction="OnList"/>
+        <button id="AbbrCtxIgnoreList" label="Игнорируемые…"           onAction="OnIgnoreList"/>
+        <button id="AbbrCtxGotoDict"   label="Перейти к перечню"       onAction="OnGotoDict"/>
+        <button id="AbbrCtxSettings"   label="Настройки…"              onAction="OnSettings"/>
+      </menu>
+    </contextMenu>
+
+    <!-- Правый клик внутри таблицы (перечень часто оформлен таблицей) -->
+    <contextMenu idMso="ContextMenuTextTable">
+      <menuSeparator id="AbbrCtxSepT"/>
+      <button id="AbbrCtxAddT"      getLabel="GetAddLabel"      getVisible="GetAddVisible"      onAction="OnCtxAdd"/>
+      <button id="AbbrCtxIgnoreT"   getLabel="GetIgnoreLabel"   getVisible="GetIgnoreVisible"   onAction="OnCtxIgnore"/>
+      <button id="AbbrCtxUnignoreT" getLabel="GetUnignoreLabel" getVisible="GetUnignoreVisible" onAction="OnCtxUnignore"/>
+      <button id="AbbrCtxGotoT"     getLabel="GetGotoLabel"     getVisible="GetGotoVisible"     onAction="OnCtxGoto"/>
+      <menu id="AbbrCtxMenuT" label="Abbreviator">
+        <button id="AbbrCtxCheckT"      label="Проверить документ"    onAction="OnCheck"/>
+        <button id="AbbrCtxClearT"      label="Снять подсветку"       onAction="OnClear"/>
+        <button id="AbbrCtxPagesT"      label="Листы перечня…"        onAction="OnPages"/>
+        <button id="AbbrCtxListT"       label="Найденные сокращения…" onAction="OnList"/>
+        <button id="AbbrCtxIgnoreListT" label="Игнорируемые…"         onAction="OnIgnoreList"/>
+        <button id="AbbrCtxGotoDictT"   label="Перейти к перечню"     onAction="OnGotoDict"/>
+        <button id="AbbrCtxSettingsT"   label="Настройки…"            onAction="OnSettings"/>
+      </menu>
+    </contextMenu>
+
+  </contextMenus>
+
+</customUI>
